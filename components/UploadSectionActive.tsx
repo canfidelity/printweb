@@ -94,32 +94,32 @@ export default function UploadSectionActive() {
 
               <div className="relative z-10 flex flex-col items-center group/cards">
                 {/* Stacked cards: back (tilted) + front with gradient circle & "Add your photo" */}
-                <div className="relative mb-8 h-[200px] w-[280px]">
+                <div className="relative mb-8 h-[160px] w-[220px] sm:h-[200px] sm:w-[280px]">
                   {/* Back card — eğik, soldan taşan */}
                   <div
-                    className="absolute -rotate-[22deg] rounded-2xl border-2 border-gray-200 p-[3px] bg-white shadow-lg w-[200px] transition-transform duration-300 ease-out group-hover/cards:translate-x-[-6px] group-hover/cards:translate-y-[-2px]"
-                    style={{ left: '-17px', top: '-23px', height: '200px', zIndex: 0 }}
+                    className="absolute left-[-8px] top-[-14px] h-[158px] w-[158px] -rotate-[22deg] rounded-2xl border-2 border-gray-200 bg-white p-[3px] shadow-lg transition-transform duration-300 ease-out group-hover/cards:translate-x-[-6px] group-hover/cards:translate-y-[-2px] sm:left-[-17px] sm:top-[-23px] sm:h-[200px] sm:w-[200px]"
+                    style={{ zIndex: 0 }}
                   >
                     <div className="h-full w-full rounded-[14px] bg-gray-50/95" />
                   </div>
                   {/* Back card — eğik, sağdan taşan */}
                   <div
-                    className="absolute rotate-[22deg] rounded-2xl border-2 border-gray-200 p-[3px] bg-white shadow-lg w-[200px] transition-transform duration-300 ease-out group-hover/cards:translate-x-[6px] group-hover/cards:translate-y-[-2px]"
-                    style={{ right: '-17px', top: '-23px', height: '200px', zIndex: 0 }}
+                    className="absolute right-[-8px] top-[-14px] h-[158px] w-[158px] rotate-[22deg] rounded-2xl border-2 border-gray-200 bg-white p-[3px] shadow-lg transition-transform duration-300 ease-out group-hover/cards:translate-x-[6px] group-hover/cards:translate-y-[-2px] sm:right-[-17px] sm:top-[-23px] sm:h-[200px] sm:w-[200px]"
+                    style={{ zIndex: 0 }}
                   >
                     <div className="h-full w-full rounded-[14px] bg-gray-50/95" />
                   </div>
                   {/* Front card — düz, ortada önde */}
-                  <div className="absolute bottom-0 left-1/2 z-10 w-[180px] -translate-x-1/2 rounded-2xl border-2 border-gray-200 p-[3px] bg-white shadow-md transition-transform duration-300 ease-out group-hover/cards:-translate-x-1/2 group-hover/cards:-translate-y-2">
-                    <div className="rounded-[14px] bg-gray-50/95 px-5 py-9">
+                  <div className="absolute bottom-0 left-1/2 z-10 w-[144px] -translate-x-1/2 rounded-2xl border-2 border-gray-200 bg-white p-[3px] shadow-md transition-transform duration-300 ease-out group-hover/cards:-translate-x-1/2 group-hover/cards:-translate-y-2 sm:w-[180px]">
+                    <div className="rounded-[14px] bg-gray-50/95 px-4 py-6 sm:px-5 sm:py-9">
                     <div className="flex flex-col items-center justify-center">
                       <div
-                        className="mb-5 flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full text-white shadow-inner"
+                        className="mb-4 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-white shadow-inner sm:mb-5 sm:h-16 sm:w-16"
                         style={{ background: 'linear-gradient(to bottom, #FF8C5F, #E91E63)' }}
                       >
-                        <span className="text-3xl font-bold leading-none">+</span>
+                        <span className="text-2xl font-bold leading-none sm:text-3xl">+</span>
                       </div>
-                      <p className="text-center font-medium text-gray-700">
+                      <p className="text-center text-sm font-medium text-gray-700 sm:text-base">
                         <span className="block">Add your</span>
                         <span className="block">photo</span>
                       </p>

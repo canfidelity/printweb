@@ -74,32 +74,36 @@ export default function Hero() {
   };
 
   return (
-    <section id="home" className="sm:pb-6 sm:pt-24 w-full pt-16 pb-5 relative overflow-hidden" style={{ background: 'linear-gradient(180deg, rgba(252,234,234,0.08) 0%, rgba(253,242,242,0.04) 15%, #FFFFFF 35%)' }}>
+    <section
+      id="home"
+      className="sm:pb-6 sm:pt-24 w-full pt-[calc(96px+env(safe-area-inset-top))] pb-5 relative overflow-hidden"
+      style={{ background: 'linear-gradient(180deg, rgba(252,234,234,0.08) 0%, rgba(253,242,242,0.04) 15%, #FFFFFF 35%)' }}
+    >
       {/* Large ambient glows */}
       <div className="absolute top-[-100px] left-1/2 -translate-x-1/2 w-[900px] h-[500px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(ellipse, rgba(239,68,68,0.04) 0%, transparent 70%)' }} />
       <div className="absolute top-10 -left-32 w-[500px] h-[500px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.03) 0%, transparent 60%)' }} />
       <div className="absolute top-10 -right-32 w-[500px] h-[500px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(251,146,60,0.025) 0%, transparent 60%)' }} />
 
 
-      <div className="relative max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-10">
+      <div className="relative max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-10">
         <div className="px-0 py-0 sm:px-0 sm:py-0 lg:px-0">
           {/* Headline */}
           <div className="mx-auto max-w-3xl text-center" style={{ animation: 'fadeSlideIn 1s ease-out 0.1s both' }}>
-            <h1 className="text-4xl sm:text-6xl lg:text-7xl leading-[1.06] tracking-tighter font-sans font-semibold">
-              <span className="whitespace-nowrap">
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-[1.06] tracking-tighter font-sans font-semibold">
+              <span className="whitespace-normal sm:whitespace-nowrap">
                 Print your photos ready in
               </span>{' '}
-              <span className="inline-flex items-baseline whitespace-nowrap">
+              <span className="block flex flex-wrap justify-center items-baseline gap-x-2 gap-y-1 sm:inline-flex sm:flex-nowrap sm:whitespace-nowrap">
                 <span className="text-red-600">1 hour</span>
-                <span className="ml-2">at</span>
-                <span className="relative ml-2 inline-flex">
+                <span>at</span>
+                <span className="relative inline-flex">
                   <span className="absolute inset-0 -skew-x-12 rounded-full bg-gradient-to-r from-red-100 via-pink-100 to-red-100 -z-10" />
                   <span className="relative inline-flex items-center px-3 text-red-600 italic font-serif">
                     Walgreens
                   </span>
                 </span>
               </span>
-              <span className="block whitespace-nowrap tracking-tighter font-sans font-semibold">
+              <span className="block whitespace-normal sm:whitespace-nowrap tracking-tighter font-sans font-semibold">
                 or delivered to your door!
               </span>
             </h1>

@@ -156,9 +156,12 @@ export default function NavbarCentered({ variant = 'default', orderSteps = [], c
   const [trackView, setTrackView] = useState<'list' | 'detail'>('list');
   const [trackAnimating, setTrackAnimating] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>(initialCartItems);
+  const [mobileSheetOffset, setMobileSheetOffset] = useState(0);
+  const [mobileSheetDragging, setMobileSheetDragging] = useState(false);
   const footerRef = useRef<HTMLElement | null>(null);
   const cartRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const mobileDragStartY = useRef<number | null>(null);
 
   useEffect(() => {
     footerRef.current = document.getElementById('pricing');
@@ -187,6 +190,8 @@ export default function NavbarCentered({ variant = 'default', orderSteps = [], c
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (window.innerWidth < 640) return;
+
       if (cartRef.current && !cartRef.current.contains(e.target as Node)) {
         setCartOpen(false);
       }
@@ -200,6 +205,97 @@ export default function NavbarCentered({ variant = 'default', orderSteps = [], c
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [cartOpen, trackOpen]);
+
+  useEffect(() => {
+    if (!cartOpen && !trackOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setCartOpen(false);
+        setTrackOpen(false);
+      }
+    };
+
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [cartOpen, trackOpen]);
+
+  const resetMobileSheetDrag = () => {
+    setMobileSheetOffset(0);
+    setMobileSheetDragging(false);
+    mobileDragStartY.current = null;
+  };
+
+  const closeTrackPanel = () => {
+    resetMobileSheetDrag();
+    setTrackOpen(false);
+    setSelectedOrder(null);
+    setTrackView('list');
+    setTrackAnimating(false);
+  };
+
+  const closeCartPanel = () => {
+    resetMobileSheetDrag();
+    setCartOpen(false);
+  };
+
+  const startMobileSheetDrag = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (window.innerWidth >= 640) return;
+
+    mobileDragStartY.current = e.touches[0]?.clientY ?? null;
+    setMobileSheetDragging(true);
+  };
+
+  const moveMobileSheetDrag = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (mobileDragStartY.current === null) return;
+
+    const currentY = e.touches[0]?.clientY ?? mobileDragStartY.current;
+    const nextOffset = Math.max(0, currentY - mobileDragStartY.current);
+    setMobileSheetOffset(nextOffset);
+  };
+
+  const endMobileSheetDrag = () => {
+    if (mobileDragStartY.current === null) return;
+
+    const shouldClose = mobileSheetOffset > 120;
+    mobileDragStartY.current = null;
+    setMobileSheetDragging(false);
+
+    if (shouldClose) {
+      if (trackOpen) {
+        closeTrackPanel();
+      } else if (cartOpen) {
+        closeCartPanel();
+      }
+      return;
+    }
+
+    setMobileSheetOffset(0);
+  };
+
+  const toggleTrackPanel = () => {
+    const nextOpen = !trackOpen;
+    resetMobileSheetDrag();
+    setTrackOpen(nextOpen);
+    setCartOpen(false);
+    if (nextOpen) {
+      setSelectedOrder(null);
+      setTrackView('list');
+      setTrackAnimating(false);
+    }
+  };
+
+  const toggleCartPanel = () => {
+    resetMobileSheetDrag();
+    setCartOpen(prev => !prev);
+    setTrackOpen(false);
+  };
 
   const openOrderDetail = (id: string) => {
     setTrackAnimating(true);
@@ -231,6 +327,227 @@ export default function NavbarCentered({ variant = 'default', orderSteps = [], c
   const subtotal = cartItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
   const deliveryFee = subtotal > 50 ? 0 : 3.99;
   const total = subtotal + deliveryFee;
+  const activeOrder = orders.find(order => order.id === selectedOrder);
+  const mobileSheetProgress = Math.min(mobileSheetOffset / 320, 1);
+  const mobileSheetStyle = {
+    transform: `translateY(${mobileSheetOffset}px)`,
+    transition: mobileSheetDragging ? 'none' : 'transform 280ms cubic-bezier(0.22, 1, 0.36, 1)',
+  };
+  const mobileBackdropOpacity = 0.35 * (1 - mobileSheetProgress);
+
+  const renderTrackPanelContent = () => (
+    <div
+      className="transition-all duration-300 ease-out"
+      style={{
+        opacity: trackAnimating ? 0 : 1,
+        transform: trackAnimating
+          ? (trackView === 'detail' ? 'translateX(12px)' : 'translateX(-12px)')
+          : 'translateX(0)',
+      }}
+    >
+      {!activeOrder ? (
+        <>
+          <div className="px-5 pt-5 pb-4 sm:px-6 sm:pt-6 sm:pb-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">My Orders</h3>
+                <p className="mt-1 text-sm text-gray-400">{orders.length} orders found</p>
+              </div>
+              <button onClick={closeTrackPanel} className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="scrollbar-hide max-h-[min(62vh,420px)] overflow-y-auto px-5 pb-6 sm:max-h-[420px] sm:px-6">
+            {orders.map((order, i) => (
+              <button
+                key={order.id}
+                onClick={() => openOrderDetail(order.id)}
+                className={`w-full rounded-2xl p-4 text-left ring-1 ring-gray-100 transition-all duration-200 hover:ring-red-200 hover:shadow-sm sm:p-5 ${i !== orders.length - 1 ? 'mb-3' : ''}`}
+              >
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-gray-900">{order.id}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${order.statusColor}`}>{order.status}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-xl bg-gray-50 ring-1 ring-gray-200">
+                    <img src={order.product.image} alt="" className="h-full w-full object-cover" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-gray-900">{order.product.name}</p>
+                    <p className="mt-0.5 text-sm text-gray-400">Qty: {order.product.qty} · {order.date}</p>
+                  </div>
+                  <div className="flex items-center gap-1 text-gray-400">
+                    <span className="text-sm font-semibold text-gray-900">{order.product.price}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6" /></svg>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="px-5 pt-5 pb-4 sm:px-6 sm:pt-6 sm:pb-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button onClick={backToList} className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" /></svg>
+                </button>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Order {activeOrder.id}</h3>
+                  <p className="mt-1 text-sm text-gray-400">Placed {activeOrder.date}</p>
+                </div>
+              </div>
+              <button onClick={closeTrackPanel} className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="mx-5 mb-5 rounded-2xl p-4 ring-1 ring-gray-100 sm:mx-6 sm:p-5">
+            <div className="flex items-center gap-3">
+              <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-2xl bg-gray-50 ring-1 ring-gray-200">
+                <img src={activeOrder.product.image} alt="" className="h-full w-full object-cover" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-900">{activeOrder.product.name}</p>
+                <p className="mt-0.5 text-sm text-gray-400">Qty: {activeOrder.product.qty} · {activeOrder.product.location}</p>
+              </div>
+              <span className="text-sm font-semibold text-gray-900">{activeOrder.product.price}</span>
+            </div>
+          </div>
+
+          <div className="scrollbar-hide max-h-[min(46vh,340px)] overflow-y-auto px-5 pb-2 sm:px-6">
+            <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">Tracking History</p>
+            <div className="relative ml-1">
+              {activeOrder.steps.map((step, i) => {
+                const isLast = i === activeOrder.steps.length - 1;
+                return (
+                  <div key={i} className="flex gap-2.5 pb-2 last:pb-0">
+                    <div className="flex flex-col items-center">
+                      <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full ${step.done ? 'bg-green-500' : 'bg-gray-200'}`}>
+                        {step.done && (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                        )}
+                      </span>
+                      {!isLast && (
+                        <div className={`mt-1 w-0.5 flex-1 ${step.done ? 'bg-green-300' : 'bg-gray-200'}`} />
+                      )}
+                    </div>
+                    <div className="pb-1">
+                      <p className={`text-[13px] font-semibold ${step.done ? 'text-gray-900' : 'text-gray-400'}`}>{step.label}</p>
+                      <p className="text-xs text-gray-400">{step.desc}</p>
+                      {step.date && <p className="mt-0.5 text-xs text-gray-300">{step.date}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 border-t border-gray-100 px-5 pt-4 pb-6 sm:px-6">
+            <button onClick={backToList} className="flex flex-1 items-center justify-center rounded-2xl px-4 py-3 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition-colors hover:bg-gray-50">
+              All Orders
+            </button>
+            <button className="flex flex-1 items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-red-700">
+              Contact Support
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  const renderCartPanelContent = () => (
+    <>
+      <div className="px-5 pt-5 pb-4 sm:px-6 sm:pt-6 sm:pb-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Order Summary</h3>
+            <p className="mt-1 text-sm text-gray-400 sm:text-base">Review your items before checkout</p>
+          </div>
+          <button
+            onClick={closeCartPanel}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="scrollbar-hide max-h-[min(52vh,380px)] overflow-y-auto px-5 sm:px-6">
+        {cartItems.map((item, i) => (
+          <div key={item.id} className={`py-3 ${i !== cartItems.length - 1 ? 'border-b border-gray-100' : ''}`}>
+            <div className="flex items-start gap-3">
+              <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-2xl bg-gray-50 ring-1 ring-gray-200">
+                <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold text-gray-900">{item.name}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <p className="text-base font-semibold text-red-600">${(item.unitPrice * item.qty).toFixed(2)}</p>
+                  {item.badges.includes('discount') && item.originalUnitPrice > item.unitPrice && (
+                    <p className="text-sm font-medium text-gray-400 line-through">
+                      ${(item.originalUnitPrice * item.qty).toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-shrink-0 flex-col items-end gap-2">
+                <div className="flex items-center rounded-full bg-white ring-1 ring-gray-200">
+                  <button onClick={() => updateQty(item.id, -1)} className="flex h-9 w-9 items-center justify-center text-gray-400 transition-colors hover:text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /></svg>
+                  </button>
+                  <span className="w-7 text-center text-sm font-semibold text-gray-900">{String(item.qty).padStart(2, '0')}</span>
+                  <button onClick={() => updateQty(item.id, 1)} className="flex h-9 w-9 items-center justify-center text-gray-400 transition-colors hover:text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+                  </button>
+                </div>
+                {item.badges.length > 0 && (
+                  <div className="flex max-w-[170px] flex-wrap items-center justify-end gap-1">
+                    {item.badges.map(badge => {
+                      const cfg = badgeConfig[badge];
+                      return (
+                        <span key={badge} className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium ${cfg.bg} ${cfg.text}`}>
+                          {cfg.icon}
+                          {cfg.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t border-gray-100 px-5 pt-5 pb-6 sm:px-6">
+        <div className="mb-3 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">Subtotal</span>
+            <span className="text-sm font-medium text-gray-900">${subtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">Estimated Delivery</span>
+            <span className="text-sm font-medium text-gray-900">{deliveryFee === 0 ? 'Free' : `$${deliveryFee.toFixed(2)}`}</span>
+          </div>
+          <div className="h-px bg-gray-100" />
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-gray-900">Total</span>
+            <span className="text-base font-bold text-gray-900">${total.toFixed(2)}</span>
+          </div>
+        </div>
+        <button className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3.5 text-base font-semibold text-white transition-all duration-300 hover:bg-red-700 hover:shadow-lg">
+          Proceed To Payment
+        </button>
+      </div>
+    </>
+  );
 
   return (
     <>
@@ -244,7 +561,7 @@ export default function NavbarCentered({ variant = 'default', orderSteps = [], c
       >
         <div className="max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-10">
           <div className="rounded-full bg-white/80 backdrop-blur-md ring-1 ring-gray-200/60 px-6 py-3">
-            <div className="relative flex items-center">
+              <div className="relative flex items-center w-full">
               {variant === 'order' ? (
                 <>
                   <div className="w-[140px] flex-shrink-0" aria-hidden />
@@ -253,20 +570,20 @@ export default function NavbarCentered({ variant = 'default', orderSteps = [], c
                   </div>
                   <Link
                     href="/"
-                    className={`absolute flex items-center gap-2 flex-shrink-0 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${orderRevealed ? 'left-6 translate-x-0' : 'left-1/2 -translate-x-1/2'}`}
+                    className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-2 flex-shrink-0 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${orderRevealed ? 'left-6 translate-x-0' : 'left-6 translate-x-0 sm:left-1/2 sm:-translate-x-1/2'}`}
                   >
-                    <img src="/EasyPrint.svg" alt="Easy Print" className="h-5 w-auto block" />
-                    <span className="text-gray-300 text-sm leading-none">×</span>
-                    <img src="/wallgreens.svg" alt="Walgreens" className="h-[18px] w-auto block" />
+                    <img src="/EasyPrint.svg" alt="Easy Print" className="h-4 sm:h-5 w-auto block" />
+                    <span className="text-gray-300 text-[12px] sm:text-sm leading-none">×</span>
+                    <img src="/wallgreens.svg" alt="Walgreens" className="h-[16px] sm:h-[18px] w-auto block" />
                   </Link>
                 </>
               ) : (
                 <>
                   <div className="flex-1" />
-                  <Link href="/" className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
-                    <img src="/EasyPrint.svg" alt="Easy Print" className="h-5 w-auto block" />
-                    <span className="text-gray-300 text-sm leading-none">×</span>
-                    <img src="/wallgreens.svg" alt="Walgreens" className="h-[18px] w-auto block" />
+                  <Link href="/" className="absolute left-6 top-1/2 -translate-y-1/2 flex items-center gap-2 sm:left-1/2 sm:-translate-x-1/2">
+                    <img src="/EasyPrint.svg" alt="Easy Print" className="h-4 sm:h-5 w-auto block" />
+                    <span className="text-gray-300 text-[12px] sm:text-sm leading-none">×</span>
+                    <img src="/wallgreens.svg" alt="Walgreens" className="h-[16px] sm:h-[18px] w-auto block" />
                   </Link>
                 </>
               )}
@@ -285,7 +602,7 @@ export default function NavbarCentered({ variant = 'default', orderSteps = [], c
                 ) : (
                   <div className="relative" ref={trackRef}>
                     <button
-                      onClick={() => { setTrackOpen(!trackOpen); setCartOpen(false); setSelectedOrder(null); }}
+                      onClick={toggleTrackPanel}
                       className="flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-all duration-300 shadow-sm hover:shadow-md whitespace-nowrap flex-shrink-0 min-w-0"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
@@ -294,154 +611,25 @@ export default function NavbarCentered({ variant = 'default', orderSteps = [], c
                       <span className="hidden sm:inline whitespace-nowrap">Track Order</span>
                     </button>
 
-                  <div
-                    className="absolute top-full right-0 mt-3 w-[410px] origin-top-right transition-all duration-300"
-                    style={{
-                      opacity: trackOpen ? 1 : 0,
-                      transform: trackOpen ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(-8px)',
-                      pointerEvents: trackOpen ? 'auto' : 'none',
-                    }}
-                  >
-                    <div className="rounded-2xl bg-white ring-1 ring-gray-200 shadow-2xl overflow-hidden">
-                      <div
-                        className="transition-all duration-300 ease-out"
-                        style={{
-                          opacity: trackAnimating ? 0 : 1,
-                          transform: trackAnimating
-                            ? (trackView === 'detail' ? 'translateX(12px)' : 'translateX(-12px)')
-                            : 'translateX(0)',
-                        }}
-                      >
-                        {(() => {
-                          const activeOrder = orders.find(o => o.id === selectedOrder);
-
-                          if (!activeOrder) {
-                            return (
-                              <>
-                                <div className="px-6 pt-6 pb-5">
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <h3 className="text-lg font-semibold text-gray-900">My Orders</h3>
-                                      <p className="text-sm text-gray-400 mt-1">{orders.length} orders found</p>
-                                    </div>
-                                    <button onClick={() => setTrackOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-                                    </button>
-                                  </div>
-                                </div>
-
-                                <div className="p-2 px-6 pb-6 max-h-[420px] overflow-y-auto scrollbar-hide">
-                                  {orders.map((order, i) => (
-                                    <button
-                                      key={order.id}
-                                      onClick={() => openOrderDetail(order.id)}
-                                      className={`w-full text-left rounded-2xl ring-1 ring-gray-100 hover:ring-red-200 p-5 transition-all duration-200 hover:shadow-sm ${i !== orders.length - 1 ? 'mb-3' : ''}`}
-                                    >
-                                      <div className="flex items-center justify-between mb-2">
-                                        <span className="text-sm font-semibold text-gray-900">{order.id}</span>
-                                        <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${order.statusColor}`}>{order.status}</span>
-                                      </div>
-                                      <div className="flex items-center gap-3">
-                                        <div className="w-11 h-11 rounded-xl overflow-hidden ring-1 ring-gray-200 flex-shrink-0 bg-gray-50">
-                                          <img src={order.product.image} alt="" className="w-full h-full object-cover" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-sm font-medium text-gray-900 truncate">{order.product.name}</p>
-                                          <p className="text-sm text-gray-400 mt-0.5">Qty: {order.product.qty} · {order.date}</p>
-                                        </div>
-                                        <div className="flex items-center gap-1 text-gray-400">
-                                          <span className="text-sm font-semibold text-gray-900">{order.product.price}</span>
-                                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6" /></svg>
-                                        </div>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </>
-                            );
-                          }
-
-                          return (
-                            <>
-                              <div className="px-6 pt-6 pb-5">
-                                <div className="flex items-start justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <button onClick={backToList} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors">
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" /></svg>
-                                    </button>
-                                    <div>
-                                      <h3 className="text-lg font-semibold text-gray-900">Order {activeOrder.id}</h3>
-                                      <p className="text-sm text-gray-400 mt-1">Placed {activeOrder.date}</p>
-                                    </div>
-                                  </div>
-                                  <button onClick={() => setTrackOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="mx-6 mb-5 rounded-2xl ring-1 ring-gray-100 p-5">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-14 h-14 rounded-2xl overflow-hidden ring-1 ring-gray-200 flex-shrink-0 bg-gray-50">
-                                    <img src={activeOrder.product.image} alt="" className="w-full h-full object-cover" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-gray-900">{activeOrder.product.name}</p>
-                                    <p className="text-sm text-gray-400 mt-0.5">Qty: {activeOrder.product.qty} · {activeOrder.product.location}</p>
-                                  </div>
-                                  <span className="text-sm font-semibold text-gray-900">{activeOrder.product.price}</span>
-                                </div>
-                              </div>
-
-                              <div className="px-6 pb-2">
-                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">Tracking History</p>
-                                <div className="relative ml-1">
-                                  {activeOrder.steps.map((step, i) => {
-                                    const isLast = i === activeOrder.steps.length - 1;
-                                    return (
-                                      <div key={i} className="flex gap-2.5 pb-2 last:pb-0">
-                                        <div className="flex flex-col items-center">
-                                          <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${step.done ? 'bg-green-500' : 'bg-gray-200'}`}>
-                                            {step.done && (
-                                              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-                                            )}
-                                          </span>
-                                          {!isLast && (
-                                            <div className={`w-0.5 flex-1 mt-1 ${step.done ? 'bg-green-300' : 'bg-gray-200'}`} />
-                                          )}
-                                        </div>
-                                        <div className="pb-1">
-                                          <p className={`text-[13px] font-semibold ${step.done ? 'text-gray-900' : 'text-gray-400'}`}>{step.label}</p>
-                                          <p className="text-xs text-gray-400">{step.desc}</p>
-                                          {step.date && <p className="text-xs text-gray-300 mt-0.5">{step.date}</p>}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-
-                              <div className="px-6 pt-4 pb-6 border-t border-gray-100 flex items-center gap-3">
-                                <button onClick={backToList} className="flex-1 flex items-center justify-center rounded-2xl ring-1 ring-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                                  All Orders
-                                </button>
-                                <button className="flex-1 flex items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 transition-all duration-300">
-                                  Contact Support
-                                </button>
-                              </div>
-                            </>
-                          );
-                        })()}
+                    <div
+                      className="absolute top-full right-0 mt-3 hidden w-[410px] origin-top-right transition-all duration-300 sm:block"
+                      style={{
+                        opacity: trackOpen ? 1 : 0,
+                        transform: trackOpen ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(-8px)',
+                        pointerEvents: trackOpen ? 'auto' : 'none',
+                      }}
+                    >
+                      <div className="overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-gray-200">
+                        {renderTrackPanelContent()}
                       </div>
                     </div>
-                  </div>
                   </div>
                 )}
 
                 {variant !== 'order' && (
                 <div className="relative" ref={cartRef}>
                   <button
-                    onClick={() => { setCartOpen(!cartOpen); setTrackOpen(false); }}
+                    onClick={toggleCartPanel}
                     className={`relative flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 transition-colors duration-200 shadow-sm hover:shadow-md ${totalItems > 0 ? 'animate-cart-wiggle' : ''}`}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -458,98 +646,15 @@ export default function NavbarCentered({ variant = 'default', orderSteps = [], c
                   </button>
 
                   <div
-                    className="absolute top-full right-0 mt-3 w-[480px] origin-top-right transition-all duration-300"
+                    className="absolute top-full right-0 mt-3 hidden w-[480px] origin-top-right transition-all duration-300 sm:block"
                     style={{
                       opacity: cartOpen ? 1 : 0,
                       transform: cartOpen ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(-8px)',
                       pointerEvents: cartOpen ? 'auto' : 'none',
                     }}
                   >
-                    <div className="rounded-2xl bg-white ring-1 ring-gray-200 shadow-2xl overflow-hidden">
-                      <div className="px-6 pt-6 pb-5">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Order Summary</h3>
-                            <p className="text-base text-gray-400 mt-1">Review your items before checkout</p>
-                          </div>
-                          <button
-                            onClick={() => setCartOpen(false)}
-                            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="px-6 max-h-[380px] overflow-y-auto scrollbar-hide">
-                        {cartItems.map((item, i) => (
-                          <div key={item.id} className={`py-3 ${i !== cartItems.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                            <div className="flex items-start gap-3">
-                              <div className="w-16 h-16 rounded-2xl overflow-hidden ring-1 ring-gray-200 flex-shrink-0 bg-gray-50">
-                                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-base font-semibold text-gray-900">{item.name}</p>
-                                <div className="mt-1 flex items-center gap-2">
-                                  <p className="text-base font-semibold text-red-600">${(item.unitPrice * item.qty).toFixed(2)}</p>
-                                  {item.badges.includes('discount') && item.originalUnitPrice > item.unitPrice && (
-                                    <p className="text-sm font-medium text-gray-400 line-through">
-                                      ${(item.originalUnitPrice * item.qty).toFixed(2)}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                                <div className="flex items-center ring-1 ring-gray-200 rounded-full bg-white">
-                                  <button onClick={() => updateQty(item.id, -1)} className="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /></svg>
-                                  </button>
-                                  <span className="text-sm font-semibold text-gray-900 w-7 text-center">{String(item.qty).padStart(2, '0')}</span>
-                                  <button onClick={() => updateQty(item.id, 1)} className="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-                                  </button>
-                                </div>
-                                {item.badges.length > 0 && (
-                                  <div className="flex items-center justify-end gap-1 flex-wrap max-w-[170px]">
-                                    {item.badges.map(badge => {
-                                      const cfg = badgeConfig[badge];
-                                      return (
-                                        <span key={badge} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${cfg.bg} ${cfg.text} text-[10px] font-medium`}>
-                                          {cfg.icon}
-                                          {cfg.label}
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="px-6 pt-5 pb-6 border-t border-gray-100">
-                        <div className="space-y-1.5 mb-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-500">Subtotal</span>
-                            <span className="text-sm font-medium text-gray-900">${subtotal.toFixed(2)}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-500">Estimated Delivery</span>
-                            <span className="text-sm font-medium text-gray-900">{deliveryFee === 0 ? 'Free' : `$${deliveryFee.toFixed(2)}`}</span>
-                          </div>
-                          <div className="h-px bg-gray-100" />
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-gray-900">Total</span>
-                            <span className="text-base font-bold text-gray-900">${total.toFixed(2)}</span>
-                          </div>
-                        </div>
-                        <button className="w-full flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3.5 text-base font-semibold text-white hover:bg-red-700 transition-all duration-300 hover:shadow-lg">
-                          Proceed To Payment
-                        </button>
-                      </div>
+                    <div className="overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-gray-200">
+                      {renderCartPanelContent()}
                     </div>
                   </div>
                 </div>
@@ -559,7 +664,58 @@ export default function NavbarCentered({ variant = 'default', orderSteps = [], c
           </div>
         </div>
       </nav>
+
+      {variant !== 'order' && trackOpen && (
+        <div className="fixed inset-0 z-[60] sm:hidden">
+          <button
+            onClick={closeTrackPanel}
+            aria-label="Close track order sheet"
+            className="absolute inset-0 backdrop-blur-[2px]"
+            style={{ backgroundColor: `rgba(17, 24, 39, ${mobileBackdropOpacity})` }}
+          />
+          <div
+            className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-hidden rounded-t-[28px] bg-white shadow-2xl"
+            style={mobileSheetStyle}
+          >
+            <div
+              className="touch-none px-5 pt-3 pb-2"
+              onTouchStart={startMobileSheetDrag}
+              onTouchMove={moveMobileSheetDrag}
+              onTouchEnd={endMobileSheetDrag}
+              onTouchCancel={endMobileSheetDrag}
+            >
+              <div className="mx-auto h-1.5 w-12 rounded-full bg-gray-200" aria-hidden />
+            </div>
+            {renderTrackPanelContent()}
+          </div>
+        </div>
+      )}
+
+      {variant !== 'order' && cartOpen && (
+        <div className="fixed inset-0 z-[60] sm:hidden">
+          <button
+            onClick={closeCartPanel}
+            aria-label="Close cart sheet"
+            className="absolute inset-0 backdrop-blur-[2px]"
+            style={{ backgroundColor: `rgba(17, 24, 39, ${mobileBackdropOpacity})` }}
+          />
+          <div
+            className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-hidden rounded-t-[28px] bg-white shadow-2xl"
+            style={mobileSheetStyle}
+          >
+            <div
+              className="touch-none px-5 pt-3 pb-2"
+              onTouchStart={startMobileSheetDrag}
+              onTouchMove={moveMobileSheetDrag}
+              onTouchEnd={endMobileSheetDrag}
+              onTouchCancel={endMobileSheetDrag}
+            >
+              <div className="mx-auto h-1.5 w-12 rounded-full bg-gray-200" aria-hidden />
+            </div>
+            {renderCartPanelContent()}
+          </div>
+        </div>
+      )}
     </>
   );
 }
-
