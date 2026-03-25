@@ -3,13 +3,24 @@
 import Link from 'next/link';
 import React, { useEffect, useRef, useState } from 'react';
 
-const initialCartItems = [
-  { id: 1, name: '4×6 Print', qty: 2, unitPrice: 0.35, originalUnitPrice: 0.35, image: '/photo-1.png', badges: ['shipping'] as const },
-  { id: 2, name: 'Retro 4×6', qty: 1, unitPrice: 0.99, originalUnitPrice: 1.29, image: '/photo-2.png', badges: ['discount'] as const },
-  { id: 3, name: '8×10 Print', qty: 1, unitPrice: 6.99, originalUnitPrice: 8.99, image: '/photo-3.png', badges: ['shipping', 'discount'] as const },
-];
-
 type BadgeType = 'shipping' | 'discount' | 'secure';
+
+type CartItem = {
+  id: number;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  originalUnitPrice: number;
+  image: string;
+  badges: BadgeType[];
+};
+
+const initialCartItems: CartItem[] = [
+  // Not: badges'i açık tip ile geniş tutuyoruz. `as const` yüzünden TS bazen `never` çıkarabiliyor.
+  { id: 1, name: '4×6 Print', qty: 2, unitPrice: 0.35, originalUnitPrice: 0.35, image: '/photo-1.png', badges: ['shipping'] },
+  { id: 2, name: 'Retro 4×6', qty: 1, unitPrice: 0.99, originalUnitPrice: 1.29, image: '/photo-2.png', badges: ['discount'] },
+  { id: 3, name: '8×10 Print', qty: 1, unitPrice: 6.99, originalUnitPrice: 8.99, image: '/photo-3.png', badges: ['shipping', 'discount'] },
+];
 
 const badgeConfig: Record<BadgeType, { label: string; bg: string; text: string; icon: React.ReactNode }> = {
   shipping: {
@@ -144,7 +155,7 @@ export default function NavbarCentered({ variant = 'default', orderSteps = [], c
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [trackView, setTrackView] = useState<'list' | 'detail'>('list');
   const [trackAnimating, setTrackAnimating] = useState(false);
-  const [cartItems, setCartItems] = useState(initialCartItems);
+  const [cartItems, setCartItems] = useState<CartItem[]>(initialCartItems);
   const footerRef = useRef<HTMLElement | null>(null);
   const cartRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
